@@ -1,23 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const {
-  getProfile,
-  updateProfile,
-  changePassword,
-  updateNotificationSettings,
-  updatePreferences,
-  addFamilyMember,
-  removeFamilyMember,
-} = require("../controllers/profileController");
-const { protect } = require("../middleware/authMiddleware");
+const protect = require("../middleware/authMiddleware");
+const { getProfile, updateProfile, getProfileStats } = require("../controllers/profileController");
 
-router.use(protect);
-
-router.route("/").get(getProfile).put(updateProfile);
-router.put("/password", changePassword);
-router.put("/notifications", updateNotificationSettings);
-router.put("/preferences", updatePreferences);
-router.post("/family", addFamilyMember);
-router.delete("/family/:memberId", removeFamilyMember);
+router.get("/", protect, getProfile);
+router.put("/", protect, updateProfile);
+router.get("/stats", protect, getProfileStats);
 
 module.exports = router;

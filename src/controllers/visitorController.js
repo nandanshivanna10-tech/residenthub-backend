@@ -1,134 +1,117 @@
-const asyncHandler = require("express-async-handler");
 const Visitor = require("../models/Visitor");
 
-// @desc    Expected visitors for logged-in resident (or all, for security/admin)
-// @route   GET /api/visitors/expected
-// @access  Private
-const getExpectedVisitors = asyncHandler(async (req, res) => {
-  const filter = { status: "Expected" };
-  if (req.user.role === "resident") filter.resident = req.user._id;
+exports.preRegisterVisitor = async (req, res) => {
+  try {
+    const { name, phone, purpose, vehicleNumber, expectedAt } = req.body;
 
-  const visitors = await Visitor.find(filter)
-    .populate("resident", "fullName tower unit")
-    .sort({ expectedDateTime: 1 });
+    if (!name || !expectedAt) {
+      return res.status(400).json({ message: "Visitor name and expected date/time are required" });
+    }
 
-  res.json({ success: true, count: visitors.length, data: visitors });
-});
+    const visitor = await Visitor.create({
+      user: req.user.id,
+      name,
+      phone,
+      purpose,
+      vehicleNumber,
+      expectedAt,
+      status: "Expected",
+    });
 
-// @desc    Check-in history (Checked In / Checked Out)
-// @route   GET /api/visitors/history
-// @access  Private
-const getVisitorHistory = asyncHandler(async (req, res) => {
-  const filter = { status: { $in: ["Checked In", "Checked Out"] } };
-  if (req.user.role === "resident") filter.resident = req.user._id;
-
-  const visitors = await Visitor.find(filter)
-    .populate("resident", "fullName tower unit")
-    .sort({ checkInTime: -1 })
-    .limit(50);
-
-  res.json({ success: true, count: visitors.length, data: visitors });
-});
-
-// @desc    Pre-register a visitor ("Pre-Registration Form")
-// @route   POST /api/visitors
-// @access  Private (resident)
-const preRegisterVisitor = asyncHandler(async (req, res) => {
-  const { visitorName, phone, visitorKind, relationOrService, purpose, expectedDateTime, vehicleNumber } =
-    req.body;
-
-  if (!visitorName || !purpose || !expectedDateTime) {
-    res.status(400);
-    throw new Error("visitorName, purpose and expectedDateTime are required");
+    res.status(201).json(visitor);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to pre-register visitor", error: error.message });
   }
+};
 
-  const visitor = await Visitor.create({
-    resident: req.user._id,
-    tower: req.user.tower,
-    unit: req.user.unit,
-    visitorName,
-    phone,
-    visitorKind,
-    relationOrService,
-    purpose,
-    expectedDateTime,
-    vehicleNumber,
-  });
-
-  res.status(201).json({ success: true, data: visitor });
-});
-
-// @desc    Edit an existing pass ("Edit Pass" button)
-// @route   PUT /api/visitors/:id
-// @access  Private
-const updateVisitorPass = asyncHandler(async (req, res) => {
-  const visitor = await Visitor.findById(req.params.id);
-  if (!visitor) {
-    res.status(404);
-    throw new Error("Visitor pass not found");
+exports.getExpectedVisitors = async (req, res) => {
+  try {
+    const visitors = await Visitor.find({ user: req.user.id, status: "Expected" }).sort({ expectedAt: 1 });
+    res.status(200).json(visitors);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch expected visitors", error: error.message });
   }
+};
 
-  const editable = ["visitorName", "phone", "purpose", "expectedDateTime", "vehicleNumber", "relationOrService"];
-  editable.forEach((field) => {
-    if (req.body[field] !== undefined) visitor[field] = req.body[field];
-  });
-
-  await visitor.save();
-  res.json({ success: true, data: visitor });
-});
-
-// @desc    Revoke a pending pass ("Revoke" button)
-// @route   PUT /api/visitors/:id/revoke
-// @access  Private
-const revokeVisitorPass = asyncHandler(async (req, res) => {
-  const visitor = await Visitor.findById(req.params.id);
-  if (!visitor) {
-    res.status(404);
-    throw new Error("Visitor pass not found");
+exports.getCheckInHistory = async (req, res) => {
+  try {
+    const visitors = await Visitor.find({
+      user: req.user.id,
+      status: { $in: ["Checked Out", "Checked In"] },
+    }).sort({ checkInTime: -1 });
+    res.status(200).json(visitors);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch check-in history", error: error.message });
   }
-  visitor.status = "Revoked";
-  await visitor.save();
-  res.json({ success: true, data: visitor });
-});
+};
 
-// @desc    Security guard checks a visitor in
-// @route   PUT /api/visitors/:id/check-in
-// @access  Private (security, admin)
-const checkInVisitor = asyncHandler(async (req, res) => {
-  const visitor = await Visitor.findById(req.params.id);
-  if (!visitor) {
-    res.status(404);
-    throw new Error("Visitor pass not found");
+exports.checkInVisitor = async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ message: "Visitor not found" });
+    }
+    visitor.status = "Checked In";
+    visitor.checkInTime = new Date();
+    await visitor.save();
+    res.status(200).json(visitor);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to check in visitor", error: error.message });
   }
-  visitor.status = "Checked In";
-  visitor.checkInTime = new Date();
-  visitor.checkedInBy = req.user._id;
-  await visitor.save();
-  res.json({ success: true, data: visitor });
-});
+};
 
-// @desc    Security guard checks a visitor out
-// @route   PUT /api/visitors/:id/check-out
-// @access  Private (security, admin)
-const checkOutVisitor = asyncHandler(async (req, res) => {
-  const visitor = await Visitor.findById(req.params.id);
-  if (!visitor) {
-    res.status(404);
-    throw new Error("Visitor pass not found");
+exports.checkOutVisitor = async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ message: "Visitor not found" });
+    }
+    visitor.status = "Checked Out";
+    visitor.checkOutTime = new Date();
+    await visitor.save();
+    res.status(200).json(visitor);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to check out visitor", error: error.message });
   }
-  visitor.status = "Checked Out";
-  visitor.checkOutTime = new Date();
-  visitor.checkedOutBy = req.user._id;
-  await visitor.save();
-  res.json({ success: true, data: visitor });
-});
+};
 
-module.exports = {
-  getExpectedVisitors,
-  getVisitorHistory,
-  preRegisterVisitor,
-  updateVisitorPass,
-  revokeVisitorPass,
-  checkInVisitor,
-  checkOutVisitor,
+exports.revokePass = async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ message: "Visitor not found" });
+    }
+    if (visitor.user.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized to revoke this pass" });
+    }
+    visitor.status = "Revoked";
+    await visitor.save();
+    res.status(200).json({ message: "Visitor pass revoked" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to revoke pass", error: error.message });
+  }
+};
+
+exports.updateVisitor = async (req, res) => {
+  try {
+    const visitor = await Visitor.findById(req.params.id);
+    if (!visitor) {
+      return res.status(404).json({ message: "Visitor not found" });
+    }
+    if (visitor.user.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized to edit this visitor" });
+    }
+
+    const { name, phone, purpose, vehicleNumber, expectedAt } = req.body;
+    visitor.name = name || visitor.name;
+    visitor.phone = phone || visitor.phone;
+    visitor.purpose = purpose || visitor.purpose;
+    visitor.vehicleNumber = vehicleNumber || visitor.vehicleNumber;
+    visitor.expectedAt = expectedAt || visitor.expectedAt;
+
+    await visitor.save();
+    res.status(200).json(visitor);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update visitor", error: error.message });
+  }
 };

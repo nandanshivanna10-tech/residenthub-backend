@@ -1,112 +1,62 @@
-const asyncHandler = require("express-async-handler");
 const User = require("../models/User");
+const Maintenance = require("../models/Maintenance");
+const Visitor = require("../models/Visitor");
+const Event = require("../models/Event");
+const Bill = require("../models/Bill");
 
-// @desc    Get own profile
-// @route   GET /api/profile
-// @access  Private
-const getProfile = asyncHandler(async (req, res) => {
-  res.json({ success: true, data: req.user });
-});
-
-// @desc    Update Personal Info tab (name, email, phone, emergency contact, vehicle, parking)
-// @route   PUT /api/profile
-// @access  Private
-const updateProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  if (!user) {
-    res.status(404);
-    throw new Error("User not found");
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch profile", error: error.message });
   }
+};
 
-  const editable = ["fullName", "email", "phone", "vehicleNumber", "parkingSlot"];
-  editable.forEach((field) => {
-    if (req.body[field] !== undefined) user[field] = req.body[field];
-  });
+exports.updateProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-  if (req.body.emergencyContact) {
-    user.emergencyContact = { ...user.emergencyContact, ...req.body.emergencyContact };
+    const { fullName, email, phone, emergencyContact, vehicleNumber, parkingSlot } = req.body;
+
+    user.fullName = fullName || user.fullName;
+    user.email = email || user.email;
+    user.phone = phone || user.phone;
+    user.emergencyContact = emergencyContact || user.emergencyContact;
+    user.vehicleNumber = vehicleNumber || user.vehicleNumber;
+    user.parkingSlot = parkingSlot || user.parkingSlot;
+
+    await user.save();
+
+    const updatedUser = await User.findById(req.user.id).select("-password");
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update profile", error: error.message });
   }
+};
 
-  await user.save();
-  res.json({ success: true, data: user });
-});
+exports.getProfileStats = async (req, res) => {
+  try {
+    const userId = req.user.id;
 
-// @desc    Change password (Security tab)
-// @route   PUT /api/profile/password
-// @access  Private
-const changePassword = asyncHandler(async (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !newPassword) {
-    res.status(400);
-    throw new Error("currentPassword and newPassword are required");
+    const maintenanceCount = await Maintenance.countDocuments({ user: userId });
+    const visitorsCount = await Visitor.countDocuments({ user: userId });
+    const eventsAttended = await Event.countDocuments({ attendees: userId });
+    const billsPaid = await Bill.countDocuments({ user: userId, status: "Paid" });
+
+    res.status(200).json({
+      maintenanceRequestsRaised: maintenanceCount,
+      visitorsPreRegistered: visitorsCount,
+      communityEventsAttended: eventsAttended,
+      billsFullyPaid: billsPaid,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch profile stats", error: error.message });
   }
-
-  const user = await User.findById(req.user._id).select("+password");
-  const isMatch = await user.matchPassword(currentPassword);
-  if (!isMatch) {
-    res.status(401);
-    throw new Error("Current password is incorrect");
-  }
-
-  user.password = newPassword;
-  await user.save();
-  res.json({ success: true, message: "Password updated successfully" });
-});
-
-// @desc    Update notification settings (Notifications tab)
-// @route   PUT /api/profile/notifications
-// @access  Private
-const updateNotificationSettings = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  user.notificationSettings = { ...user.notificationSettings, ...req.body };
-  await user.save();
-  res.json({ success: true, data: user.notificationSettings });
-});
-
-// @desc    Update preferences: currency (INR), language (EN/HI), theme (light/dark) - (Preferences tab)
-// @route   PUT /api/profile/preferences
-// @access  Private
-const updatePreferences = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  user.preferences = { ...user.preferences, ...req.body };
-  await user.save();
-  res.json({ success: true, data: user.preferences });
-});
-
-// @desc    Add a family member
-// @route   POST /api/profile/family
-// @access  Private
-const addFamilyMember = asyncHandler(async (req, res) => {
-  const { name, relation, photoUrl } = req.body;
-  if (!name || !relation) {
-    res.status(400);
-    throw new Error("name and relation are required");
-  }
-
-  const user = await User.findById(req.user._id);
-  user.familyMembers.push({ name, relation, photoUrl });
-  await user.save();
-  res.status(201).json({ success: true, data: user.familyMembers });
-});
-
-// @desc    Remove a family member
-// @route   DELETE /api/profile/family/:memberId
-// @access  Private
-const removeFamilyMember = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  user.familyMembers = user.familyMembers.filter(
-    (m) => m._id.toString() !== req.params.memberId
-  );
-  await user.save();
-  res.json({ success: true, data: user.familyMembers });
-});
-
-module.exports = {
-  getProfile,
-  updateProfile,
-  changePassword,
-  updateNotificationSettings,
-  updatePreferences,
-  addFamilyMember,
-  removeFamilyMember,
 };

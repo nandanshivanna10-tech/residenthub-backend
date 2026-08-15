@@ -1,77 +1,89 @@
-const asyncHandler = require("express-async-handler");
 const Event = require("../models/Event");
 
-// @desc    List events, optional ?filter=upcoming|past|my
-// @route   GET /api/events
-// @access  Private
-const getEvents = asyncHandler(async (req, res) => {
-  const filter = {};
-  const now = new Date();
+exports.createEvent = async (req, res) => {
+  try {
+    const { title, category, description, organizer, date, location, imageUrl } = req.body;
 
-  if (req.query.filter === "upcoming") filter.date = { $gte: now };
-  if (req.query.filter === "past") filter.date = { $lt: now };
-  if (req.query.filter === "my") filter.attendees = req.user._id;
-  if (req.query.search) filter.title = { $regex: req.query.search, $options: "i" };
+    if (!title || !category || !description || !date || !location) {
+      return res.status(400).json({ message: "Title, category, description, date, and location are required" });
+    }
 
-  const events = await Event.find(filter).sort({ date: 1 });
+    const event = await Event.create({
+      title,
+      category,
+      description,
+      organizer,
+      date,
+      location,
+      imageUrl,
+    });
 
-  const data = events.map((e) => ({
-    ...e.toObject(),
-    isRegistered: e.attendees.some((a) => a.toString() === req.user._id.toString()),
-  }));
-
-  res.json({ success: true, count: data.length, data });
-});
-
-// @desc    Create event (Admin only)
-// @route   POST /api/events
-// @access  Private (admin)
-const createEvent = asyncHandler(async (req, res) => {
-  const { title, description, category, organizedBy, date, venue, imageUrl } = req.body;
-
-  if (!title || !description || !organizedBy || !date || !venue) {
-    res.status(400);
-    throw new Error("title, description, organizedBy, date and venue are required");
+    res.status(201).json(event);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to create event", error: error.message });
   }
+};
 
-  const event = await Event.create({ title, description, category, organizedBy, date, venue, imageUrl });
-  res.status(201).json({ success: true, data: event });
-});
+exports.getAllEvents = async (req, res) => {
+  try {
+    const { filter } = req.query;
+    const now = new Date();
+    let query = {};
 
-// @desc    RSVP / Register for an event
-// @route   PUT /api/events/:id/rsvp
-// @access  Private (resident)
-const rsvpEvent = asyncHandler(async (req, res) => {
-  const event = await Event.findById(req.params.id);
-  if (!event) {
-    res.status(404);
-    throw new Error("Event not found");
+    if (filter === "Upcoming") {
+      query.date = { $gte: now };
+    } else if (filter === "Past") {
+      query.date = { $lt: now };
+    } else if (filter === "My Events") {
+      query.attendees = req.user.id;
+    }
+
+    const events = await Event.find(query).sort({ date: 1 });
+
+    const eventsWithFlags = events.map((e) => ({
+      ...e.toObject(),
+      isRegistered: e.attendees.some((a) => a.toString() === req.user.id),
+      attendeeCount: e.attendees.length,
+    }));
+
+    res.status(200).json(eventsWithFlags);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch events", error: error.message });
   }
+};
 
-  const already = event.attendees.some((a) => a.toString() === req.user._id.toString());
-  if (already) {
-    res.status(400);
-    throw new Error("Already registered for this event");
+exports.rsvpEvent = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    const alreadyRegistered = event.attendees.some((a) => a.toString() === req.user.id);
+
+    if (alreadyRegistered) {
+      event.attendees = event.attendees.filter((a) => a.toString() !== req.user.id);
+      await event.save();
+      return res.status(200).json({ message: "RSVP cancelled", isRegistered: false });
+    }
+
+    event.attendees.push(req.user.id);
+    await event.save();
+    res.status(200).json({ message: "RSVP successful", isRegistered: true });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to RSVP", error: error.message });
   }
+};
 
-  event.attendees.push(req.user._id);
-  await event.save();
-  res.json({ success: true, message: "Registered successfully", data: event });
-});
-
-// @desc    Cancel RSVP
-// @route   PUT /api/events/:id/unrsvp
-// @access  Private (resident)
-const cancelRsvp = asyncHandler(async (req, res) => {
-  const event = await Event.findById(req.params.id);
-  if (!event) {
-    res.status(404);
-    throw new Error("Event not found");
+exports.deleteEvent = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+    await event.deleteOne();
+    res.status(200).json({ message: "Event deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete event", error: error.message });
   }
-
-  event.attendees = event.attendees.filter((a) => a.toString() !== req.user._id.toString());
-  await event.save();
-  res.json({ success: true, message: "Registration cancelled", data: event });
-});
-
-module.exports = { getEvents, createEvent, rsvpEvent, cancelRsvp };
+};

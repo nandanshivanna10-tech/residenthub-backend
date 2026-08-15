@@ -1,22 +1,18 @@
 const express = require("express");
 const router = express.Router();
+const protect = require("../middleware/authMiddleware");
 const {
-  getMaintenanceRequests,
-  getMaintenanceRequest,
-  createMaintenanceRequest,
-  updateMaintenanceRequest,
-  deleteMaintenanceRequest,
+  createRequest,
+  getMyRequests,
+  getAllRequests,
+  updateRequestStatus,
+  deleteRequest,
 } = require("../controllers/maintenanceController");
-const { protect, authorize } = require("../middleware/authMiddleware");
 
-router.use(protect);
-
-router.route("/").get(getMaintenanceRequests).post(createMaintenanceRequest);
-
-router
-  .route("/:id")
-  .get(getMaintenanceRequest)
-  .put(authorize("admin", "security"), updateMaintenanceRequest)
-  .delete(deleteMaintenanceRequest);
+router.post("/", protect, createRequest);
+router.get("/my-requests", protect, getMyRequests);
+router.get("/", protect, getAllRequests);
+router.patch("/:id/status", protect, updateRequestStatus);
+router.delete("/:id", protect, deleteRequest);
 
 module.exports = router;

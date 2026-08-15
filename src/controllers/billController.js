@@ -1,96 +1,82 @@
-const asyncHandler = require("express-async-handler");
-const { v4: uuidv4 } = require("uuid");
 const Bill = require("../models/Bill");
+const { v4: uuidv4 } = require("uuid");
 
-// @desc    Summary cards: Total Due, Last Payment, Next Bill Cycle
-// @route   GET /api/bills/summary
-// @access  Private (resident)
-const getBillSummary = asyncHandler(async (req, res) => {
-  const residentId = req.user.role === "resident" ? req.user._id : req.query.residentId;
+exports.createBill = async (req, res) => {
+  try {
+    const { type, amount, dueDate, userId } = req.body;
 
-  const unpaid = await Bill.find({ resident: residentId, status: "Unpaid" });
-  const totalDue = unpaid.reduce((sum, b) => sum + b.amount, 0);
+    if (!type || !amount || !dueDate) {
+      return res.status(400).json({ message: "Type, amount, and due date are required" });
+    }
 
-  const lastPaid = await Bill.findOne({ resident: residentId, status: "Paid" }).sort({
-    paymentDate: -1,
-  });
+    const bill = await Bill.create({
+      user: userId || req.user.id,
+      type,
+      amount,
+      dueDate,
+      status: "Unpaid",
+    });
 
-  const nextDue = unpaid.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0];
+    res.status(201).json(bill);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to create bill", error: error.message });
+  }
+};
 
-  res.json({
-    success: true,
-    data: {
+exports.getPendingBills = async (req, res) => {
+  try {
+    const bills = await Bill.find({ user: req.user.id, status: "Unpaid" }).sort({ dueDate: 1 });
+    res.status(200).json(bills);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch pending bills", error: error.message });
+  }
+};
+
+exports.getPaymentHistory = async (req, res) => {
+  try {
+    const bills = await Bill.find({ user: req.user.id, status: "Paid" }).sort({ paidOn: -1 });
+    res.status(200).json(bills);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch payment history", error: error.message });
+  }
+};
+
+exports.getBillSummary = async (req, res) => {
+  try {
+    const totalDueBill = await Bill.findOne({ user: req.user.id, status: "Unpaid" }).sort({ dueDate: 1 });
+    const lastPaidBill = await Bill.findOne({ user: req.user.id, status: "Paid" }).sort({ paidOn: -1 });
+
+    const allUnpaid = await Bill.find({ user: req.user.id, status: "Unpaid" });
+    const totalDue = allUnpaid.reduce((sum, b) => sum + b.amount, 0);
+
+    res.status(200).json({
       totalDue,
-      dueDate: nextDue?.dueDate || null,
-      lastPayment: lastPaid
-        ? { amount: lastPaid.amount, paidOn: lastPaid.paymentDate }
-        : null,
-      nextBillCycle: nextDue?.billingCycle || null,
-    },
-  });
-});
-
-// @desc    Pending bills table
-// @route   GET /api/bills/pending
-// @access  Private
-const getPendingBills = asyncHandler(async (req, res) => {
-  const filter = { status: { $in: ["Unpaid", "Overdue"] } };
-  if (req.user.role === "resident") filter.resident = req.user._id;
-  else if (req.query.residentId) filter.resident = req.query.residentId;
-
-  const bills = await Bill.find(filter).populate("resident", "fullName tower unit").sort({ dueDate: 1 });
-  res.json({ success: true, count: bills.length, data: bills });
-});
-
-// @desc    Payment history table
-// @route   GET /api/bills/history
-// @access  Private
-const getPaymentHistory = asyncHandler(async (req, res) => {
-  const filter = { status: "Paid" };
-  if (req.user.role === "resident") filter.resident = req.user._id;
-  else if (req.query.residentId) filter.resident = req.query.residentId;
-
-  const bills = await Bill.find(filter).sort({ paymentDate: -1 }).limit(50);
-  res.json({ success: true, count: bills.length, data: bills });
-});
-
-// @desc    Admin creates/generates a bill for a resident
-// @route   POST /api/bills
-// @access  Private (admin)
-const createBill = asyncHandler(async (req, res) => {
-  const { resident, billType, amount, dueDate, billingCycle, description } = req.body;
-
-  if (!resident || !billType || !amount || !dueDate) {
-    res.status(400);
-    throw new Error("resident, billType, amount and dueDate are required");
+      nextDueDate: totalDueBill?.dueDate || null,
+      lastPaymentAmount: lastPaidBill?.amount || 0,
+      lastPaymentDate: lastPaidBill?.paidOn || null,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch bill summary", error: error.message });
   }
+};
 
-  const bill = await Bill.create({ resident, billType, amount, dueDate, billingCycle, description });
-  res.status(201).json({ success: true, data: bill });
-});
+exports.payBill = async (req, res) => {
+  try {
+    const bill = await Bill.findById(req.params.id);
+    if (!bill) {
+      return res.status(404).json({ message: "Bill not found" });
+    }
+    if (bill.user.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized to pay this bill" });
+    }
 
-// @desc    "Pay Now" - mark a bill as paid
-// @route   PUT /api/bills/:id/pay
-// @access  Private (resident)
-const payBill = asyncHandler(async (req, res) => {
-  const bill = await Bill.findById(req.params.id);
-  if (!bill) {
-    res.status(404);
-    throw new Error("Bill not found");
+    bill.status = "Paid";
+    bill.paidOn = new Date();
+    bill.transactionId = `TXN-${uuidv4().slice(0, 8).toUpperCase()}`;
+    await bill.save();
+
+    res.status(200).json(bill);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to process payment", error: error.message });
   }
-  if (bill.status === "Paid") {
-    res.status(400);
-    throw new Error("This bill is already paid");
-  }
-
-  bill.status = "Paid";
-  bill.paymentDate = new Date();
-  bill.transactionId = `TXN-${Math.floor(1000000 + Math.random() * 9000000)}`;
-  bill.paymentMethod = req.body.paymentMethod || "Card";
-  bill.receiptUrl = `/receipts/${uuidv4()}.pdf`; // placeholder until a receipt-generation service is wired up
-
-  await bill.save();
-  res.json({ success: true, data: bill });
-});
-
-module.exports = { getBillSummary, getPendingBills, getPaymentHistory, createBill, payBill };
+};
