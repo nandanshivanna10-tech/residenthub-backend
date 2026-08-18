@@ -43,6 +43,27 @@ exports.getRecentAnnouncements = async (req, res) => {
   }
 };
 
+exports.updateAnnouncement = async (req, res) => {
+  try {
+    const announcement = await Announcement.findById(req.params.id);
+    if (!announcement) {
+      return res.status(404).json({ message: "Announcement not found" });
+    }
+
+    const { type, title, description, postedBy } = req.body;
+
+    announcement.type = type || announcement.type;
+    announcement.title = title || announcement.title;
+    announcement.description = description || announcement.description;
+    announcement.postedBy = postedBy || announcement.postedBy;
+
+    await announcement.save();
+    res.status(200).json(announcement);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update announcement", error: error.message });
+  }
+};
+
 exports.deleteAnnouncement = async (req, res) => {
   try {
     const announcement = await Announcement.findById(req.params.id);
