@@ -45,6 +45,21 @@ exports.getCheckInHistory = async (req, res) => {
   }
 };
 
+exports.getAllVisitors = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = status && status !== "All" ? { status } : {};
+
+    const visitors = await Visitor.find(filter)
+      .populate("user", "fullName tower unit")
+      .sort({ expectedAt: -1 });
+
+    res.status(200).json(visitors);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch all visitors", error: error.message });
+  }
+};
+
 exports.checkInVisitor = async (req, res) => {
   try {
     const visitor = await Visitor.findById(req.params.id);
@@ -81,7 +96,7 @@ exports.revokePass = async (req, res) => {
     if (!visitor) {
       return res.status(404).json({ message: "Visitor not found" });
     }
-    if (visitor.user.toString() !== req.user.id) {
+    if (visitor.user.toString() !== req.user.id && req.user.role !== "admin") {
       return res.status(403).json({ message: "Not authorized to revoke this pass" });
     }
     visitor.status = "Revoked";
@@ -98,7 +113,7 @@ exports.updateVisitor = async (req, res) => {
     if (!visitor) {
       return res.status(404).json({ message: "Visitor not found" });
     }
-    if (visitor.user.toString() !== req.user.id) {
+    if (visitor.user.toString() !== req.user.id && req.user.role !== "admin") {
       return res.status(403).json({ message: "Not authorized to edit this visitor" });
     }
 
