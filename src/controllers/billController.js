@@ -5,12 +5,12 @@ exports.createBill = async (req, res) => {
   try {
     const { type, amount, dueDate, userId } = req.body;
 
-    if (!type || !amount || !dueDate) {
-      return res.status(400).json({ message: "Type, amount, and due date are required" });
+    if (!type || !amount || !dueDate || !userId) {
+      return res.status(400).json({ message: "Type, amount, due date, and resident are required" });
     }
 
     const bill = await Bill.create({
-      user: userId || req.user.id,
+      user: userId,
       type,
       amount,
       dueDate,
@@ -78,5 +78,33 @@ exports.payBill = async (req, res) => {
     res.status(200).json(bill);
   } catch (error) {
     res.status(500).json({ message: "Failed to process payment", error: error.message });
+  }
+};
+
+exports.getAllBills = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = status && status !== "All" ? { status } : {};
+
+    const bills = await Bill.find(filter)
+      .populate("user", "fullName tower unit")
+      .sort({ dueDate: -1 });
+
+    res.status(200).json(bills);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch all bills", error: error.message });
+  }
+};
+
+exports.deleteBill = async (req, res) => {
+  try {
+    const bill = await Bill.findById(req.params.id);
+    if (!bill) {
+      return res.status(404).json({ message: "Bill not found" });
+    }
+    await bill.deleteOne();
+    res.status(200).json({ message: "Bill deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete bill", error: error.message });
   }
 };
