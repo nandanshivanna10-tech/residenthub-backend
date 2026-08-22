@@ -51,7 +51,7 @@ exports.getAllVisitors = async (req, res) => {
     const filter = status && status !== "All" ? { status } : {};
 
     const visitors = await Visitor.find(filter)
-      .populate("user", "fullName tower unit")
+      .populate("user", "fullName tower unit phone")
       .sort({ expectedAt: -1 });
 
     res.status(200).json(visitors);

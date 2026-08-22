@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const protect = require("../middleware/authMiddleware");
-const isAdmin = require("../middleware/adminMiddleware");
+const isStaff = require("../middleware/staffMiddleware");
 const {
   preRegisterVisitor,
   getExpectedVisitors,
@@ -16,9 +16,9 @@ const {
 router.post("/", protect, preRegisterVisitor);
 router.get("/expected", protect, getExpectedVisitors);
 router.get("/history", protect, getCheckInHistory);
-router.get("/all", protect, isAdmin, getAllVisitors);
-router.patch("/:id/check-in", protect, isAdmin, checkInVisitor);
-router.patch("/:id/check-out", protect, isAdmin, checkOutVisitor);
+router.get("/all", protect, isStaff, getAllVisitors);
+router.patch("/:id/check-in", protect, isStaff, checkInVisitor);
+router.patch("/:id/check-out", protect, isStaff, checkOutVisitor);
 router.patch("/:id/revoke", protect, revokePass);
 router.put("/:id", protect, updateVisitor);
 
