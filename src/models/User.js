@@ -14,6 +14,8 @@ const userSchema = new mongoose.Schema(
     vehicleNumber: { type: String },
     parkingSlot: { type: String },
     profilePhoto: { type: String },
+    resetPasswordToken: { type: String },
+    resetPasswordExpire: { type: Date },
   },
   { timestamps: true }
 );

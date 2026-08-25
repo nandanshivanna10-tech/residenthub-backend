@@ -18,7 +18,7 @@ exports.getDirectory = async (req, res) => {
     }
 
     const residents = await User.find(query).select(
-      "fullName tower unit status phone email emergencyContact vehicleNumber createdAt"
+      "fullName tower unit status phone email emergencyContact vehicleNumber profilePhoto createdAt"
     );
 
     res.status(200).json(residents);
@@ -30,7 +30,7 @@ exports.getDirectory = async (req, res) => {
 exports.getResidentById = async (req, res) => {
   try {
     const resident = await User.findById(req.params.id).select(
-      "fullName tower unit status phone email emergencyContact vehicleNumber createdAt"
+      "fullName tower unit status phone email emergencyContact vehicleNumber profilePhoto createdAt"
     );
     if (!resident) {
       return res.status(404).json({ message: "Resident not found" });
@@ -103,7 +103,7 @@ exports.updateResident = async (req, res) => {
     await resident.save();
 
     const updated = await User.findById(req.params.id).select(
-      "fullName tower unit status phone email emergencyContact vehicleNumber createdAt"
+      "fullName tower unit status phone email emergencyContact vehicleNumber profilePhoto createdAt"
     );
     res.status(200).json(updated);
   } catch (error) {
