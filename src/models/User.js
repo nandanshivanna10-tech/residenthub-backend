@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema(
     emergencyContact: { type: String },
     vehicleNumber: { type: String },
     parkingSlot: { type: String },
+    profilePhoto: { type: String },
   },
   { timestamps: true }
 );
