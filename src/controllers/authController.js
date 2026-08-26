@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
+const sendEmail = require("../utils/sendEmail");
 
 exports.signup = async (req, res) => {
   try {
@@ -42,7 +43,6 @@ exports.signup = async (req, res) => {
         tower: user.tower,
         unit: user.unit,
         status: user.status,
-        profilePhoto: user.profilePhoto,
       },
     });
   } catch (error) {
@@ -80,7 +80,6 @@ exports.login = async (req, res) => {
         tower: user.tower,
         unit: user.unit,
         status: user.status,
-        profilePhoto: user.profilePhoto,
       },
     });
   } catch (error) {
@@ -110,22 +109,32 @@ exports.forgotPassword = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(200).json({
-        message: "If an account exists with this email, a reset link has been generated.",
+        message: "If an account with that email exists, a reset link has been sent.",
       });
     }
 
-    const rawToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
 
     user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpire = Date.now() + 30 * 60 * 1000;
+    user.resetPasswordExpire = Date.now() + 30 * 60 * 1000; // 30 minutes
     await user.save();
 
-    const resetUrl = (process.env.FRONTEND_URL || "http://localhost:5173") + "/reset-password/" + rawToken;
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+    await sendEmail({
+      to: user.email,
+      subject: "ResidentHub Password Reset",
+      html: `
+        <p>Hi ${user.fullName},</p>
+        <p>You requested a password reset for your ResidentHub account.</p>
+        <p><a href="${resetUrl}">Click here to reset your password</a></p>
+        <p>This link expires in 30 minutes. If you didn't request this, you can ignore this email.</p>
+      `,
+    });
 
     res.status(200).json({
-      message: "Password reset link generated.",
-      resetUrl,
+      message: "If an account with that email exists, a reset link has been sent.",
     });
   } catch (error) {
     res.status(500).json({ message: "Failed to process request", error: error.message });
@@ -137,8 +146,8 @@ exports.resetPassword = async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
 
-    if (!password) {
-      return res.status(400).json({ message: "New password is required" });
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
@@ -149,7 +158,7 @@ exports.resetPassword = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ message: "Reset link is invalid or has expired" });
+      return res.status(400).json({ message: "Invalid or expired reset link" });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -158,7 +167,7 @@ exports.resetPassword = async (req, res) => {
     user.resetPasswordExpire = undefined;
     await user.save();
 
-    res.status(200).json({ message: "Password has been reset successfully" });
+    res.status(200).json({ message: "Password reset successful. You can now log in." });
   } catch (error) {
     res.status(500).json({ message: "Failed to reset password", error: error.message });
   }
