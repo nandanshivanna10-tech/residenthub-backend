@@ -1,7 +1,6 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
 const connectDB = require("./src/config/db");
 const authRoutes = require("./src/routes/authRoutes");
 const maintenanceRoutes = require("./src/routes/maintenanceRoutes");
@@ -12,37 +11,15 @@ const eventRoutes = require("./src/routes/eventRoutes");
 const directoryRoutes = require("./src/routes/directoryRoutes");
 const profileRoutes = require("./src/routes/profileRoutes");
 const dashboardRoutes = require("./src/routes/dashboardRoutes");
-const uploadRoutes = require("./src/routes/uploadRoutes");
 const { notFound, errorHandler } = require("./src/middleware/errorMiddleware");
 
 const app = express();
 
 connectDB();
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-];
-
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      if (
-        allowedOrigins.includes(origin) ||
-        origin.endsWith(".ngrok-free.app") ||
-        origin.endsWith(".ngrok-free.dev") ||
-        origin.endsWith(".netlify.app")
-      ) {
-        return callback(null, true);
-      }
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-  })
-);
-app.use(express.json({ limit: "50mb" }));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(cors());
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ limit: "25mb", extended: true }));
 
 app.get("/", (req, res) => {
   res.send("ResidentHub API is running");
@@ -57,7 +34,6 @@ app.use("/api/events", eventRoutes);
 app.use("/api/directory", directoryRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/upload", uploadRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

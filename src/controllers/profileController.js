@@ -50,8 +50,9 @@ exports.updateProfilePicture = async (req, res) => {
     }
 
     const sizeInBytes = (profilePicture.length * 3) / 4;
-    if (sizeInBytes > 2 * 1024 * 1024) {
-      return res.status(400).json({ message: "Image too large. Please use an image under 2MB." });
+    const maxSizeInBytes = 15 * 1024 * 1024;
+    if (sizeInBytes > maxSizeInBytes) {
+      return res.status(400).json({ message: "Image too large. Please use an image under 15MB." });
     }
 
     const user = await User.findById(req.user.id);
