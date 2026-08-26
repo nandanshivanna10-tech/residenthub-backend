@@ -41,10 +41,17 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-exports.updateProfilePhoto = async (req, res) => {
+exports.updateProfilePicture = async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: "No image file provided" });
+    const { profilePicture } = req.body;
+
+    if (!profilePicture) {
+      return res.status(400).json({ message: "No image data provided" });
+    }
+
+    const sizeInBytes = (profilePicture.length * 3) / 4;
+    if (sizeInBytes > 2 * 1024 * 1024) {
+      return res.status(400).json({ message: "Image too large. Please use an image under 2MB." });
     }
 
     const user = await User.findById(req.user.id);
@@ -52,14 +59,13 @@ exports.updateProfilePhoto = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const photoUrl = req.protocol + "://" + req.get("host") + "/uploads/" + req.file.filename;
-    user.profilePhoto = photoUrl;
+    user.profilePicture = profilePicture;
     await user.save();
 
     const updatedUser = await User.findById(req.user.id).select("-password");
     res.status(200).json(updatedUser);
   } catch (error) {
-    res.status(500).json({ message: "Failed to update profile photo", error: error.message });
+    res.status(500).json({ message: "Failed to update profile picture", error: error.message });
   }
 };
 
