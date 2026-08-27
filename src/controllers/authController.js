@@ -68,6 +68,15 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress || "Unknown";
+    const userAgent = req.headers["user-agent"] || "Unknown device";
+
+    user.loginActivity.unshift({ timestamp: new Date(), ip, userAgent });
+    if (user.loginActivity.length > 10) {
+      user.loginActivity = user.loginActivity.slice(0, 10);
+    }
+    await user.save();
+
     const token = generateToken(user._id, user.role);
 
     res.status(200).json({
@@ -117,20 +126,19 @@ exports.forgotPassword = async (req, res) => {
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
 
     user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpire = Date.now() + 30 * 60 * 1000; // 30 minutes
+    user.resetPasswordExpire = Date.now() + 30 * 60 * 1000;
     await user.save();
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+    const resetUrl = process.env.FRONTEND_URL + "/reset-password/" + resetToken;
 
     await sendEmail({
       to: user.email,
       subject: "ResidentHub Password Reset",
-      html: `
-        <p>Hi ${user.fullName},</p>
-        <p>You requested a password reset for your ResidentHub account.</p>
-        <p><a href="${resetUrl}">Click here to reset your password</a></p>
-        <p>This link expires in 30 minutes. If you didn't request this, you can ignore this email.</p>
-      `,
+      html:
+        "<p>Hi " + user.fullName + ",</p>" +
+        "<p>You requested a password reset for your ResidentHub account.</p>" +
+        '<p><a href="' + resetUrl + '">Click here to reset your password</a></p>' +
+        "<p>This link expires in 30 minutes. If you didn't request this, you can ignore this email.</p>",
     });
 
     res.status(200).json({
@@ -170,5 +178,48 @@ exports.resetPassword = async (req, res) => {
     res.status(200).json({ message: "Password reset successful. You can now log in." });
   } catch (error) {
     res.status(500).json({ message: "Failed to reset password", error: error.message });
+  }
+};
+
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current and new password are required" });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters" });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.status(200).json({ message: "Password changed successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to change password", error: error.message });
+  }
+};
+
+exports.getLoginActivity = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("loginActivity");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.status(200).json(user.loginActivity);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch login activity", error: error.message });
   }
 };

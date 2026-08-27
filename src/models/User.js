@@ -1,5 +1,14 @@
 const mongoose = require("mongoose");
 
+const loginActivitySchema = new mongoose.Schema(
+  {
+    timestamp: { type: Date, default: Date.now },
+    ip: { type: String },
+    userAgent: { type: String },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     fullName: { type: String, required: true },
@@ -16,6 +25,14 @@ const userSchema = new mongoose.Schema(
     profilePicture: { type: String },
     resetPasswordToken: { type: String },
     resetPasswordExpire: { type: Date },
+    loginActivity: { type: [loginActivitySchema], default: [] },
+    notificationPrefs: {
+      emailMaintenance: { type: Boolean, default: true },
+      emailAnnouncements: { type: Boolean, default: true },
+      emailBills: { type: Boolean, default: true },
+      pushVisitors: { type: Boolean, default: true },
+      pushEvents: { type: Boolean, default: true },
+    },
   },
   { timestamps: true }
 );

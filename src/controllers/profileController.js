@@ -70,6 +70,30 @@ exports.updateProfilePicture = async (req, res) => {
   }
 };
 
+exports.updateNotificationPrefs = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { emailMaintenance, emailAnnouncements, emailBills, pushVisitors, pushEvents } = req.body;
+
+    user.notificationPrefs = {
+      emailMaintenance: emailMaintenance !== undefined ? emailMaintenance : user.notificationPrefs.emailMaintenance,
+      emailAnnouncements: emailAnnouncements !== undefined ? emailAnnouncements : user.notificationPrefs.emailAnnouncements,
+      emailBills: emailBills !== undefined ? emailBills : user.notificationPrefs.emailBills,
+      pushVisitors: pushVisitors !== undefined ? pushVisitors : user.notificationPrefs.pushVisitors,
+      pushEvents: pushEvents !== undefined ? pushEvents : user.notificationPrefs.pushEvents,
+    };
+
+    await user.save();
+    res.status(200).json(user.notificationPrefs);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update notification preferences", error: error.message });
+  }
+};
+
 exports.getProfileStats = async (req, res) => {
   try {
     const userId = req.user.id;
