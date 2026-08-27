@@ -11,6 +11,7 @@ const eventRoutes = require("./src/routes/eventRoutes");
 const directoryRoutes = require("./src/routes/directoryRoutes");
 const profileRoutes = require("./src/routes/profileRoutes");
 const dashboardRoutes = require("./src/routes/dashboardRoutes");
+const notificationRoutes = require("./src/routes/notificationRoutes");
 const { notFound, errorHandler } = require("./src/middleware/errorMiddleware");
 
 const app = express();
@@ -34,11 +35,12 @@ app.use("/api/events", eventRoutes);
 app.use("/api/directory", directoryRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log("Server running on port " + PORT);
 });

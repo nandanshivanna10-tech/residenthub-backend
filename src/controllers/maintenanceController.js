@@ -1,4 +1,5 @@
 const Maintenance = require("../models/Maintenance");
+const createNotification = require("../utils/createNotification");
 
 exports.createRequest = async (req, res) => {
   try {
@@ -52,6 +53,14 @@ exports.updateRequestStatus = async (req, res) => {
 
     request.status = status || request.status;
     await request.save();
+
+    await createNotification({
+      userId: request.user,
+      title: "Maintenance Update",
+      message: "Your " + request.category + " request is now " + request.status,
+      type: "maintenance",
+      link: "/maintenance",
+    });
 
     res.status(200).json(request);
   } catch (error) {

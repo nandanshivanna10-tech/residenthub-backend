@@ -1,0 +1,47 @@
+const Notification = require("../models/Notification");
+
+exports.getMyNotifications = async (req, res) => {
+  try {
+    const notifications = await Notification.find({ user: req.user.id })
+      .sort({ createdAt: -1 })
+      .limit(20);
+    res.status(200).json(notifications);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch notifications", error: error.message });
+  }
+};
+
+exports.getUnreadCount = async (req, res) => {
+  try {
+    const count = await Notification.countDocuments({ user: req.user.id, read: false });
+    res.status(200).json({ count });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch unread count", error: error.message });
+  }
+};
+
+exports.markAsRead = async (req, res) => {
+  try {
+    const notification = await Notification.findById(req.params.id);
+    if (!notification) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+    if (notification.user.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    notification.read = true;
+    await notification.save();
+    res.status(200).json(notification);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update notification", error: error.message });
+  }
+};
+
+exports.markAllAsRead = async (req, res) => {
+  try {
+    await Notification.updateMany({ user: req.user.id, read: false }, { read: true });
+    res.status(200).json({ message: "All notifications marked as read" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update notifications", error: error.message });
+  }
+};

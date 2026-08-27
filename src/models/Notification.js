@@ -7,11 +7,11 @@ const notificationSchema = new mongoose.Schema(
     message: { type: String, required: true },
     type: {
       type: String,
-      enum: ["maintenance", "visitor", "bill", "announcement", "event", "general"],
+      enum: ["maintenance", "visitor", "announcement", "bill", "event", "general"],
       default: "general",
     },
-    isRead: { type: Boolean, default: false },
-    link: { type: String, default: "" }, // e.g. "/bills"
+    read: { type: Boolean, default: false },
+    link: { type: String },
   },
   { timestamps: true }
 );

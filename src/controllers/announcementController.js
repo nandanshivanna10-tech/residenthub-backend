@@ -1,4 +1,6 @@
 const Announcement = require("../models/Announcement");
+const User = require("../models/User");
+const createNotification = require("../utils/createNotification");
 
 exports.createAnnouncement = async (req, res) => {
   try {
@@ -15,6 +17,17 @@ exports.createAnnouncement = async (req, res) => {
       postedBy,
       postedByUser: req.user.id,
     });
+
+    const residents = await User.find({ role: "resident" }).select("_id");
+    for (const resident of residents) {
+      await createNotification({
+        userId: resident._id,
+        title: "New " + type,
+        message: title,
+        type: "announcement",
+        link: "/announcements",
+      });
+    }
 
     res.status(201).json(announcement);
   } catch (error) {
