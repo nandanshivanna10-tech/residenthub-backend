@@ -43,6 +43,7 @@ exports.signup = async (req, res) => {
         tower: user.tower,
         unit: user.unit,
         status: user.status,
+        profilePicture: user.profilePicture,
       },
     });
   } catch (error) {
@@ -89,6 +90,7 @@ exports.login = async (req, res) => {
         tower: user.tower,
         unit: user.unit,
         status: user.status,
+        profilePicture: user.profilePicture,
       },
     });
   } catch (error) {
