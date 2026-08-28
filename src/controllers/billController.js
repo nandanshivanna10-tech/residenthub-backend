@@ -1,16 +1,18 @@
 const Bill = require("../models/Bill");
-const { v4: uuidv4 } = require("uuid");
+const crypto = require("crypto");
+const razorpayInstance = require("../config/razorpay");
+const createNotification = require("../utils/createNotification");
 
 exports.createBill = async (req, res) => {
   try {
     const { type, amount, dueDate, userId } = req.body;
 
-    if (!type || !amount || !dueDate || !userId) {
-      return res.status(400).json({ message: "Type, amount, due date, and resident are required" });
+    if (!type || !amount || !dueDate) {
+      return res.status(400).json({ message: "Type, amount, and due date are required" });
     }
 
     const bill = await Bill.create({
-      user: userId,
+      user: userId || req.user.id,
       type,
       amount,
       dueDate,
@@ -51,16 +53,16 @@ exports.getBillSummary = async (req, res) => {
 
     res.status(200).json({
       totalDue,
-      nextDueDate: totalDueBill?.dueDate || null,
-      lastPaymentAmount: lastPaidBill?.amount || 0,
-      lastPaymentDate: lastPaidBill?.paidOn || null,
+      nextDueDate: totalDueBill ? totalDueBill.dueDate : null,
+      lastPaymentAmount: lastPaidBill ? lastPaidBill.amount : 0,
+      lastPaymentDate: lastPaidBill ? lastPaidBill.paidOn : null,
     });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch bill summary", error: error.message });
   }
 };
 
-exports.payBill = async (req, res) => {
+exports.createPaymentOrder = async (req, res) => {
   try {
     const bill = await Bill.findById(req.params.id);
     if (!bill) {
@@ -69,42 +71,68 @@ exports.payBill = async (req, res) => {
     if (bill.user.toString() !== req.user.id) {
       return res.status(403).json({ message: "Not authorized to pay this bill" });
     }
+    if (bill.status === "Paid") {
+      return res.status(400).json({ message: "This bill is already paid" });
+    }
 
-    bill.status = "Paid";
-    bill.paidOn = new Date();
-    bill.transactionId = `TXN-${uuidv4().slice(0, 8).toUpperCase()}`;
+    const amountInPaise = Math.round(bill.amount * 100);
+
+    const order = await razorpayInstance.orders.create({
+      amount: amountInPaise,
+      currency: "INR",
+      receipt: "bill_" + bill._id,
+    });
+
+    bill.razorpayOrderId = order.id;
     await bill.save();
 
-    res.status(200).json(bill);
+    res.status(200).json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: process.env.RAZORPAY_KEY_ID,
+      billId: bill._id,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Failed to process payment", error: error.message });
+    res.status(500).json({ message: "Failed to create payment order", error: error.message });
   }
 };
 
-exports.getAllBills = async (req, res) => {
+exports.verifyPayment = async (req, res) => {
   try {
-    const { status } = req.query;
-    const filter = status && status !== "All" ? { status } : {};
+    const { billId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-    const bills = await Bill.find(filter)
-      .populate("user", "fullName tower unit")
-      .sort({ dueDate: -1 });
-
-    res.status(200).json(bills);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch all bills", error: error.message });
-  }
-};
-
-exports.deleteBill = async (req, res) => {
-  try {
-    const bill = await Bill.findById(req.params.id);
+    const bill = await Bill.findById(billId);
     if (!bill) {
       return res.status(404).json({ message: "Bill not found" });
     }
-    await bill.deleteOne();
-    res.status(200).json({ message: "Bill deleted successfully" });
+
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest("hex");
+
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({ message: "Payment verification failed" });
+    }
+
+    bill.status = "Paid";
+    bill.paidOn = new Date();
+    bill.transactionId = razorpay_payment_id;
+    bill.razorpayPaymentId = razorpay_payment_id;
+    await bill.save();
+
+    await createNotification({
+      userId: bill.user,
+      title: "Payment Successful",
+      message: "Your payment of ₹" + bill.amount + " for " + bill.type + " was successful",
+      type: "bill",
+      link: "/bills",
+    });
+
+    res.status(200).json({ message: "Payment verified successfully", bill });
   } catch (error) {
-    res.status(500).json({ message: "Failed to delete bill", error: error.message });
+    res.status(500).json({ message: "Failed to verify payment", error: error.message });
   }
 };

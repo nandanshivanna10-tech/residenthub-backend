@@ -12,6 +12,7 @@ exports.getProfile = async (req, res) => {
     }
     res.status(200).json(user);
   } catch (error) {
+    console.error("getProfile error:", error);
     res.status(500).json({ message: "Failed to fetch profile", error: error.message });
   }
 };
@@ -25,18 +26,19 @@ exports.updateProfile = async (req, res) => {
 
     const { fullName, email, phone, emergencyContact, vehicleNumber, parkingSlot } = req.body;
 
-    user.fullName = fullName || user.fullName;
-    user.email = email || user.email;
-    user.phone = phone || user.phone;
-    user.emergencyContact = emergencyContact || user.emergencyContact;
-    user.vehicleNumber = vehicleNumber || user.vehicleNumber;
-    user.parkingSlot = parkingSlot || user.parkingSlot;
+    if (fullName) user.fullName = fullName;
+    if (email) user.email = email;
+    if (phone) user.phone = phone;
+    if (emergencyContact) user.emergencyContact = emergencyContact;
+    if (vehicleNumber) user.vehicleNumber = vehicleNumber;
+    if (parkingSlot) user.parkingSlot = parkingSlot;
 
     await user.save();
 
     const updatedUser = await User.findById(req.user.id).select("-password");
     res.status(200).json(updatedUser);
   } catch (error) {
+    console.error("updateProfile error:", error);
     res.status(500).json({ message: "Failed to update profile", error: error.message });
   }
 };
@@ -66,6 +68,7 @@ exports.updateProfilePicture = async (req, res) => {
     const updatedUser = await User.findById(req.user.id).select("-password");
     res.status(200).json(updatedUser);
   } catch (error) {
+    console.error("updateProfilePicture error:", error);
     res.status(500).json({ message: "Failed to update profile picture", error: error.message });
   }
 };
@@ -77,19 +80,21 @@ exports.updateNotificationPrefs = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const { emailMaintenance, emailAnnouncements, emailBills, pushVisitors, pushEvents } = req.body;
+    const existing = user.notificationPrefs || {};
+    const body = req.body || {};
 
     user.notificationPrefs = {
-      emailMaintenance: emailMaintenance !== undefined ? emailMaintenance : user.notificationPrefs.emailMaintenance,
-      emailAnnouncements: emailAnnouncements !== undefined ? emailAnnouncements : user.notificationPrefs.emailAnnouncements,
-      emailBills: emailBills !== undefined ? emailBills : user.notificationPrefs.emailBills,
-      pushVisitors: pushVisitors !== undefined ? pushVisitors : user.notificationPrefs.pushVisitors,
-      pushEvents: pushEvents !== undefined ? pushEvents : user.notificationPrefs.pushEvents,
+      emailMaintenance: body.emailMaintenance !== undefined ? body.emailMaintenance : existing.emailMaintenance,
+      emailAnnouncements: body.emailAnnouncements !== undefined ? body.emailAnnouncements : existing.emailAnnouncements,
+      emailBills: body.emailBills !== undefined ? body.emailBills : existing.emailBills,
+      pushVisitors: body.pushVisitors !== undefined ? body.pushVisitors : existing.pushVisitors,
+      pushEvents: body.pushEvents !== undefined ? body.pushEvents : existing.pushEvents,
     };
 
     await user.save();
     res.status(200).json(user.notificationPrefs);
   } catch (error) {
+    console.error("updateNotificationPrefs error:", error);
     res.status(500).json({ message: "Failed to update notification preferences", error: error.message });
   }
 };
@@ -110,6 +115,7 @@ exports.getProfileStats = async (req, res) => {
       billsFullyPaid: billsPaid,
     });
   } catch (error) {
+    console.error("getProfileStats error:", error);
     res.status(500).json({ message: "Failed to fetch profile stats", error: error.message });
   }
 };

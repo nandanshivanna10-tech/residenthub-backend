@@ -9,6 +9,8 @@ const billSchema = new mongoose.Schema(
     status: { type: String, enum: ["Unpaid", "Paid"], default: "Unpaid" },
     paidOn: { type: Date },
     transactionId: { type: String },
+    razorpayOrderId: { type: String },
+    razorpayPaymentId: { type: String },
   },
   { timestamps: true }
 );
