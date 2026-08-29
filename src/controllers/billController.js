@@ -74,6 +74,9 @@ exports.createPaymentOrder = async (req, res) => {
     if (bill.status === "Paid") {
       return res.status(400).json({ message: "This bill is already paid" });
     }
+    if (bill.amount < 10) {
+      return res.status(400).json({ message: "Bill amount must be at least ₹10.00 to process payment" });
+    }
 
     const amountInPaise = Math.round(bill.amount * 100);
 
@@ -94,6 +97,7 @@ exports.createPaymentOrder = async (req, res) => {
       billId: bill._id,
     });
   } catch (error) {
+    console.error("createPaymentOrder error:", error);
     res.status(500).json({ message: "Failed to create payment order", error: error.message });
   }
 };
@@ -133,6 +137,7 @@ exports.verifyPayment = async (req, res) => {
 
     res.status(200).json({ message: "Payment verified successfully", bill });
   } catch (error) {
+    console.error("verifyPayment error:", error);
     res.status(500).json({ message: "Failed to verify payment", error: error.message });
   }
 };
