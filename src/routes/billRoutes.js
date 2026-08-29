@@ -1,8 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const protect = require("../middleware/authMiddleware");
+const isAdmin = require("../middleware/adminMiddleware");
 const {
   createBill,
+  getAllBills,
   getPendingBills,
   getPaymentHistory,
   getBillSummary,
@@ -10,7 +12,8 @@ const {
   verifyPayment,
 } = require("../controllers/billController");
 
-router.post("/", protect, createBill);
+router.post("/", protect, isAdmin, createBill);
+router.get("/all", protect, isAdmin, getAllBills);
 router.get("/pending", protect, getPendingBills);
 router.get("/history", protect, getPaymentHistory);
 router.get("/summary", protect, getBillSummary);

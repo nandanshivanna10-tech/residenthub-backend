@@ -25,6 +25,17 @@ exports.createBill = async (req, res) => {
   }
 };
 
+exports.getAllBills = async (req, res) => {
+  try {
+    const bills = await Bill.find()
+      .populate("user", "fullName tower unit email")
+      .sort({ createdAt: -1 });
+    res.status(200).json(bills);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch all bills", error: error.message });
+  }
+};
+
 exports.getPendingBills = async (req, res) => {
   try {
     const bills = await Bill.find({ user: req.user.id, status: "Unpaid" }).sort({ dueDate: 1 });
