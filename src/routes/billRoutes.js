@@ -10,6 +10,7 @@ const {
   getBillSummary,
   createPaymentOrder,
   verifyPayment,
+  deleteBill,
 } = require("../controllers/billController");
 
 router.post("/", protect, isAdmin, createBill);
@@ -19,5 +20,6 @@ router.get("/history", protect, getPaymentHistory);
 router.get("/summary", protect, getBillSummary);
 router.post("/:id/create-order", protect, createPaymentOrder);
 router.post("/verify-payment", protect, verifyPayment);
+router.delete("/:id", protect, isAdmin, deleteBill);
 
 module.exports = router;
