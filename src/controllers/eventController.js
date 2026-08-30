@@ -8,6 +8,14 @@ exports.createEvent = async (req, res) => {
       return res.status(400).json({ message: "Title, category, description, date, and location are required" });
     }
 
+    if (imageUrl) {
+      const sizeInBytes = (imageUrl.length * 3) / 4;
+      const maxSizeInBytes = 15 * 1024 * 1024;
+      if (sizeInBytes > maxSizeInBytes) {
+        return res.status(400).json({ message: "Image too large. Please use an image under 15MB." });
+      }
+    }
+
     const event = await Event.create({
       title,
       category,
@@ -21,6 +29,38 @@ exports.createEvent = async (req, res) => {
     res.status(201).json(event);
   } catch (error) {
     res.status(500).json({ message: "Failed to create event", error: error.message });
+  }
+};
+
+exports.updateEvent = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    const { title, category, description, organizer, date, location, imageUrl } = req.body;
+
+    if (imageUrl) {
+      const sizeInBytes = (imageUrl.length * 3) / 4;
+      const maxSizeInBytes = 15 * 1024 * 1024;
+      if (sizeInBytes > maxSizeInBytes) {
+        return res.status(400).json({ message: "Image too large. Please use an image under 15MB." });
+      }
+    }
+
+    event.title = title || event.title;
+    event.category = category || event.category;
+    event.description = description || event.description;
+    event.organizer = organizer || event.organizer;
+    event.date = date || event.date;
+    event.location = location || event.location;
+    if (imageUrl) event.imageUrl = imageUrl;
+
+    await event.save();
+    res.status(200).json(event);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update event", error: error.message });
   }
 };
 
@@ -49,30 +89,6 @@ exports.getAllEvents = async (req, res) => {
     res.status(200).json(eventsWithFlags);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch events", error: error.message });
-  }
-};
-
-exports.updateEvent = async (req, res) => {
-  try {
-    const event = await Event.findById(req.params.id);
-    if (!event) {
-      return res.status(404).json({ message: "Event not found" });
-    }
-
-    const { title, category, description, organizer, date, location, imageUrl } = req.body;
-
-    event.title = title || event.title;
-    event.category = category || event.category;
-    event.description = description || event.description;
-    event.organizer = organizer || event.organizer;
-    event.date = date || event.date;
-    event.location = location || event.location;
-    event.imageUrl = imageUrl || event.imageUrl;
-
-    await event.save();
-    res.status(200).json(event);
-  } catch (error) {
-    res.status(500).json({ message: "Failed to update event", error: error.message });
   }
 };
 
