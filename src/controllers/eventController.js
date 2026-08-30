@@ -49,17 +49,18 @@ exports.updateEvent = async (req, res) => {
       }
     }
 
-    event.title = title || event.title;
-    event.category = category || event.category;
-    event.description = description || event.description;
-    event.organizer = organizer || event.organizer;
-    event.date = date || event.date;
-    event.location = location || event.location;
-    if (imageUrl) event.imageUrl = imageUrl;
+    event.title = title !== undefined ? title : event.title;
+    event.category = category !== undefined ? category : event.category;
+    event.description = description !== undefined ? description : event.description;
+    event.organizer = organizer !== undefined ? organizer : event.organizer;
+    event.date = date !== undefined ? date : event.date;
+    event.location = location !== undefined ? location : event.location;
+    event.imageUrl = imageUrl !== undefined ? imageUrl : event.imageUrl;
 
     await event.save();
     res.status(200).json(event);
   } catch (error) {
+    console.error("updateEvent error:", error);
     res.status(500).json({ message: "Failed to update event", error: error.message });
   }
 };
@@ -89,6 +90,24 @@ exports.getAllEvents = async (req, res) => {
     res.status(200).json(eventsWithFlags);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch events", error: error.message });
+  }
+};
+
+exports.getEventAttendees = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id).populate(
+      "attendees",
+      "fullName email phone tower unit profilePicture"
+    );
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+    res.status(200).json({
+      eventTitle: event.title,
+      attendees: event.attendees,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch attendees", error: error.message });
   }
 };
 
