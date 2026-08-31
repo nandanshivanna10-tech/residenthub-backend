@@ -5,6 +5,7 @@ const visitorSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     name: { type: String, required: true },
     phone: { type: String },
+    countryCode: { type: String, default: "+91" },
     purpose: { type: String },
     vehicleNumber: { type: String },
     expectedAt: { type: Date },
@@ -15,6 +16,7 @@ const visitorSchema = new mongoose.Schema(
       enum: ["Expected", "Checked In", "Checked Out", "Revoked"],
       default: "Expected",
     },
+    qrCode: { type: String, unique: true, sparse: true },
   },
   { timestamps: true }
 );
