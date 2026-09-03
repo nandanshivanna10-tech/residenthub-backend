@@ -24,6 +24,14 @@ exports.createBill = async (req, res) => {
     res.status(500).json({ message: "Failed to create bill", error: error.message });
   }
 };
+const razorpay = require("../config/razorpay");
+
+exports.createRazorpayOrder = async (req, res) => {
+  if (!razorpay) {
+    return res.status(503).json({ message: "Payment gateway is not configured" });
+  }
+  // ... rest of the function
+};
 
 exports.getAllBills = async (req, res) => {
   try {
