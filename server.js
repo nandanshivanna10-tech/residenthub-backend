@@ -16,16 +16,40 @@ const { notFound, errorHandler } = require("./src/middleware/errorMiddleware");
 
 const app = express();
 
+// 1. Connect Database
 connectDB();
 
-app.use(cors());
+// 2. Configure Explicit CORS
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL // https://residenthub-portal.onrender.com
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl/Postman)
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("CORS policy violation: Origin not allowed"), false);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  })
+);
+
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ limit: "25mb", extended: true }));
 
+// Health check endpoint
 app.get("/", (req, res) => {
   res.send("ResidentHub API is running");
 });
 
+// API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/maintenance", maintenanceRoutes);
 app.use("/api/visitors", visitorRoutes);
@@ -37,6 +61,7 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/notifications", notificationRoutes);
 
+// Error Middlewares
 app.use(notFound);
 app.use(errorHandler);
 
